@@ -1,52 +1,119 @@
+#!/usr/bin/env Rscript
+#
 # Generate README images for Cachexia Analysis
-# Run from project root: Rscript generate_readme_images.R
+#
+# Regenerates the plots shown in README.md: BCS trajectories (with SEM),
+# weight trajectories (% change from baseline), and BCS Kaplan-Meier survival.
+#
+# Usage (from project root):
+#   Rscript generate_readme_images.R
+#
+# Or from R:
+#   setwd("/path/to/cachexia_analysis")
+#   source("generate_readme_images.R")
+#
 
-# Find project root (folder containing app.R and this script)
-args <- commandArgs(trailingOnly = FALSE)
-script_match <- grep("^--file=", args, value = TRUE)
-root <- if (length(script_match)) {
-  dirname(normalizePath(sub("^--file=", "", script_match), winslash = "/"))
-} else {
-  getwd()
-}
-if (!file.exists(file.path(root, "app.R"))) {
-  stop("Run from Cachexia project root (folder containing app.R). Current dir: ", getwd())
-}
-setwd(root)
+# ------------------------------------------------------------------------------
+# Setup: find project root and load analysis code
+# ------------------------------------------------------------------------------
 
-source("AnalysisCode/source_all.R")
-
-# Create images directory
-img_dir <- "images"
-if (!dir.exists(img_dir)) dir.create(img_dir, showWarnings = FALSE)
-
-# Load data (Excel only - no digital data needed for BCS/weight plots)
-meta <- load_treatment_metadata()
-bcs <- load_bcs_data()
-weights <- load_weight_data()
-merged <- merge_all_data(meta = meta, bcs = bcs, weights = weights, digital = NULL)
-
-# 1. BCS trajectories
-p_bcs <- plot_bcs_trajectories(merged$bcs_with_treatment, by_treatment = TRUE, show_mean = TRUE, threshold = BCS_CACHEXIA_THRESHOLD)
-if (!is.null(p_bcs) && inherits(p_bcs, "gg")) {
-  ggplot2::ggsave(file.path(img_dir, "bcs_trajectories.png"), p_bcs, width = 8, height = 5, dpi = 120)
-  message("Saved: ", file.path(img_dir, "bcs_trajectories.png"))
+find_project_root <- function() {
+  # When run via Rscript, use the script's directory
+  args <- commandArgs(trailingOnly = FALSE)
+  script_match <- grep("^--file=", args, value = TRUE)
+  if (length(script_match) > 0L) {
+    root <- dirname(normalizePath(sub("^--file=", "", script_match), winslash = "/"))
+  } else {
+    root <- getwd()
+  }
+  if (!file.exists(file.path(root, "app.R"))) {
+    stop("Cannot find project root. Run from the cachexia_analysis directory (folder containing app.R).")
+  }
+  root
 }
 
-# 2. Weight trajectories (% change from baseline)
-p_weight <- plot_weight_trajectories(merged$weights_with_treatment, percent_change = TRUE, by_treatment = TRUE, show_mean = TRUE)
-if (!is.null(p_weight) && inherits(p_weight, "gg")) {
-  ggplot2::ggsave(file.path(img_dir, "weight_trajectories.png"), p_weight, width = 8, height = 5, dpi = 120)
-  message("Saved: ", file.path(img_dir, "weight_trajectories.png"))
-}
+main <- function() {
+  root <- find_project_root()
+  setwd(root)
 
-# 3. BCS survival (Kaplan-Meier)
-if (exists("plot_bcs_survival_curve") && requireNamespace("survival", quietly = TRUE)) {
-  png(file.path(img_dir, "bcs_survival.png"), width = 800, height = 500, res = 120, bg = "white")
+  # Source analysis code
+  source_path <- file.path(root, "AnalysisCode", "source_all.R")
+  if (!file.exists(source_path)) {
+    stop("Missing AnalysisCode/source_all.R")
+  }
+  source(source_path)
+
+  # Output directory
+  img_dir <- file.path(root, "images")
+  if (!dir.exists(img_dir)) {
+    dir.create(img_dir, showWarnings = FALSE)
+  }
+
+  # Load data
+  if (!file.exists(PATH_EXCEL)) {
+    stop("Excel file not found: ", PATH_EXCEL)
+  }
+  meta <- load_treatment_metadata()
+  bcs <- load_bcs_data()
+  weights <- load_weight_data()
+  merged <- merge_all_data(meta = meta, bcs = bcs, weights = weights, digital = NULL)
+
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package ggplot2 is required. Install with: install.packages('ggplot2')")
+  }
+
+  # --------------------------------------------------------------------------
+  # 1. BCS trajectories (mean ± SEM) — different style with error bars
+  # --------------------------------------------------------------------------
   tryCatch({
-    plot_bcs_survival_curve(merged$bcs_with_treatment, threshold = BCS_CACHEXIA_THRESHOLD)
-  }, finally = dev.off())
-  message("Saved: ", file.path(img_dir, "bcs_survival.png"))
+    p <- plot_bcs_trajectories_with_sem(
+      merged$bcs_with_treatment,
+      threshold = BCS_CACHEXIA_THRESHOLD
+    )
+    out <- file.path(img_dir, "bcs_trajectories.png")
+    ggplot2::ggsave(out, p, width = 8, height = 5, dpi = 120)
+    message("Saved: ", out)
+  }, error = function(e) {
+    warning("BCS trajectories (SEM): ", conditionMessage(e))
+  })
+
+  # --------------------------------------------------------------------------
+  # 2. Weight trajectories (% change from baseline)
+  # --------------------------------------------------------------------------
+  tryCatch({
+    p <- plot_weight_trajectories(
+      merged$weights_with_treatment,
+      percent_change = TRUE,
+      by_treatment = TRUE,
+      show_mean = TRUE
+    )
+    if (!is.null(p) && inherits(p, "gg")) {
+      out <- file.path(img_dir, "weight_trajectories.png")
+      ggplot2::ggsave(out, p, width = 8, height = 5, dpi = 120)
+      message("Saved: ", out)
+    }
+  }, error = function(e) {
+    warning("Weight trajectories: ", conditionMessage(e))
+  })
+
+  # --------------------------------------------------------------------------
+  # 3. BCS survival (Kaplan-Meier)
+  # --------------------------------------------------------------------------
+  if (requireNamespace("survival", quietly = TRUE) && exists("plot_bcs_survival_curve")) {
+    tryCatch({
+      out <- file.path(img_dir, "bcs_survival.png")
+      grDevices::png(out, width = 800, height = 500, res = 120, bg = "white")
+      on.exit(grDevices::dev.off(), add = TRUE)
+      plot_bcs_survival_curve(merged$bcs_with_treatment, threshold = BCS_CACHEXIA_THRESHOLD)
+      message("Saved: ", out)
+    }, error = function(e) {
+      warning("BCS survival: ", conditionMessage(e))
+    })
+  } else {
+    message("Skipping BCS survival (package 'survival' required)")
+  }
+
+  message("Done. Images saved to ", img_dir)
 }
 
-message("Done. Images saved to ", img_dir, "/")
+main()

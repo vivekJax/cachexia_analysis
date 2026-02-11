@@ -4,6 +4,26 @@ Interactive R/Shiny dashboard for analyzing cachexia study data: human scoring (
 
 ---
 
+## Analysis Output Examples
+
+The dashboard produces several key visualizations from the study data:
+
+**BCS trajectories (mean ± SEM)** — Body Condition Score over time with group mean lines and standard error bars. Colored by treatment (CT-26 vs Vehicle). Dashed line at BCS = 3 indicates a common cachexia threshold.
+
+![BCS trajectories](images/bcs_trajectories.png)
+
+**Weight trajectories** — Weight as percent change from baseline over time, with group means.
+
+![Weight trajectories](images/weight_trajectories.png)
+
+**BCS survival (time to BCS &lt; 3)** — Kaplan–Meier curve showing time until first BCS below threshold. Vehicle = blue circles, CT-26 = red squares.
+
+![BCS survival](images/bcs_survival.png)
+
+To regenerate these images after data or analysis changes: run `Rscript generate_readme_images.R` from the project root.
+
+---
+
 ## Requirements
 
 - **R** (4.x recommended)

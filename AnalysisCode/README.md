@@ -78,7 +78,7 @@ Paths in `config.R` point to:
 - `Final Cachexia in CD2 F1 mice with CT-26.xlsx`
 - `CCX_C1_animal_1min_2026-01-28T18_21_57Z.csv`
 
-Set `CACHEXIA_ROOT` to the folder containing these files if you run from a different directory.
+The digital cage CSV (~514 MB) is not stored in the repo; place it in the project root (or set `CACHEXIA_ROOT`) to use the Digital Phenotyping tab and full pipeline. Set `CACHEXIA_ROOT` to the folder containing these files if you run from a different directory.
 
 ## Phase 5: Shiny dashboard
 
@@ -98,8 +98,3 @@ R -e "shiny::runApp()"
 ```
 
 The dashboard has five tabs: **Data Overview**, **Human Scoring** (BCS/weight trajectories and comparisons), **Digital Phenotyping** (feature selection and trajectories), **Early Detection** (onset tables, lead time, effect sizes), and **Export** (download CSVs). Use the sidebar to set digital data row limit and click "Load / refresh analysis" to run the full pipeline.
-
-
-setwd('/Users/vkumar/Downloads/Cachexia')
-
-shiny::runApp()

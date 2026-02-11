@@ -1,0 +1,14 @@
+# R
+.RData
+.Rhistory
+*.Rproj.user
+Rplots.pdf
+debug*.log
+
+# OS / IDE
+.DS_Store
+*.swp
+.cursor/
+
+# Large digital cage data (over GitHub 100MB limit)
+CCX_C1_animal_1min_*.csv
